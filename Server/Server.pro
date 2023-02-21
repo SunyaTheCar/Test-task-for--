@@ -27,3 +27,5 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     Server.h
+
+RESOURCES = test.txt
