@@ -26,3 +26,5 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     client.h
+
+RESOURCES = test.txt
