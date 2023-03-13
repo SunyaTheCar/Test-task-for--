@@ -12,7 +12,7 @@
 class Client : public QObject{
     Q_OBJECT
 public:
-    Client(QString fileName, QString port);
+    Client(QString fileName, QString port, int wait = 50000);
     void connect(QString address, qint16 port = 0);
 private:
     QTcpSocket *socket;
@@ -22,6 +22,7 @@ private:
     QMap <int, QByteArray> datagramaFile;
     void generate_datagram();
     int endKey;
+    int waitAnswer;
 private slots:
     void succsesfull_connect();
     void readData();

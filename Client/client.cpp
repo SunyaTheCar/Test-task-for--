@@ -1,11 +1,11 @@
 #include "client.h"
 
-Client::Client(QString fileName, QString port){ //Объявляем сокеты и соединяем сигналы и слоты
+Client::Client(QString fileName, QString port, int wait){ //Объявляем сокеты и соединяем сигналы и слоты
     socket = new QTcpSocket(this);
     udp_socket = new QUdpSocket(this);
     portUdp = port;
     this->fileName = fileName;
-
+    waitAnswer = wait;
     QObject::connect(this, SIGNAL(startSendFile(QString)), this, SLOT(sendFileUDP(QString)));
     QObject::connect(socket, SIGNAL(connected()), this, SLOT(succsesfull_connect()));
     QObject::connect(socket, SIGNAL(readyRead()), this, SLOT(readData()));
@@ -21,7 +21,7 @@ void Client::generate_datagram() // Генерация датаграммы
     if(file.open(QFile::ReadOnly)){
         qint64 raw_size = 0;
         int  id = 0;
-        const qint64 datagram_size = 128;
+        const qint64 datagram_size = 1024;
 
         char raw_data[datagram_size];
 
@@ -67,11 +67,14 @@ void Client::sendFileUDP(QString id) //Отправка файла через UD
 {
     udp_socket->abort();
     QByteArray datagram;
-
     QDataStream streamFile(&datagram, QIODevice::WriteOnly);
     streamFile << id;
     streamFile << datagramaFile.value(id.toInt());
     udp_socket->writeDatagram(datagram, socket->localAddress(), portUdp.toUShort());
+    while (true){
+        if (socket->waitForReadyRead(waitAnswer)) break;
+        else udp_socket->writeDatagram(datagram, socket->localAddress(), portUdp.toUShort());;
+    }
 }
 
 void Client::readAnswer() //Считывание ответа о принятии
