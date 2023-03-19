@@ -8,6 +8,8 @@
 #include <QFileDevice>
 #include <QFile>
 #include <QCryptographicHash>
+#include <QList>
+#include "thread.h"
 
 class Client : public QObject{
     Q_OBJECT
@@ -20,16 +22,18 @@ private:
     QString portUdp;
     QString fileName;
     QMap <int, QByteArray> datagramaFile;
+    Thread *th;
     void generate_datagram();
     int endKey;
     int waitAnswer;
+    void sendFileUDP();
+    void resendFile(QList<int> id);
 private slots:
     void succsesfull_connect();
     void readData();
-    void sendFileUDP(QString id = "0");
     void readAnswer();
 signals:
-    void startSendFile(QString id = "0");
+    void goToThread(QMap<int, QByteArray> datagram, QUdpSocket *socket, QHostAddress adress, ushort port);
 };
 
 #endif // CLIENT_H

@@ -1,14 +1,14 @@
 #include "client.h"
-
 Client::Client(QString fileName, QString port, int wait){ //Объявляем сокеты и соединяем сигналы и слоты
     socket = new QTcpSocket(this);
     udp_socket = new QUdpSocket(this);
     portUdp = port;
     this->fileName = fileName;
     waitAnswer = wait;
-    QObject::connect(this, SIGNAL(startSendFile(QString)), this, SLOT(sendFileUDP(QString)));
     QObject::connect(socket, SIGNAL(connected()), this, SLOT(succsesfull_connect()));
     QObject::connect(socket, SIGNAL(readyRead()), this, SLOT(readData()));
+    th = new Thread;
+    QObject::connect(this, &Client::goToThread, th, &Thread::sendFileUdp);
 }
 
 void Client::connect(QString address, qint16 port){ // Подключение к серверу
@@ -30,13 +30,14 @@ void Client::generate_datagram() // Генерация датаграммы
            QByteArray buffer = QByteArray::fromRawData(raw_data, raw_size);
 
            datagramaFile.insert(id, buffer);
-
            id++;
         }
         endKey = id;
-        emit(startSendFile());
+        th->start();
+        emit goToThread(datagramaFile, udp_socket, socket->localAddress(), portUdp.toUShort());
     }
 }
+
 
 void Client::succsesfull_connect() //Слот срабатывающий при emit-е сигнала connected()
 {
@@ -53,7 +54,6 @@ void Client::readData(){ //Считывание данных о получени
     QByteArray buff;
     QDataStream stream (socket);
     stream.setVersion(QDataStream::Qt_5_14);
-
     stream.startTransaction();
     stream >> buff;
     stream.abortTransaction();
@@ -63,17 +63,15 @@ void Client::readData(){ //Считывание данных о получени
     generate_datagram();
 }
 
-void Client::sendFileUDP(QString id) //Отправка файла через UDP
+void Client::resendFile(QList<int> id) //Отправка файла через UDP
 {
-    udp_socket->abort();
     QByteArray datagram;
     QDataStream streamFile(&datagram, QIODevice::WriteOnly);
-    streamFile << id;
-    streamFile << datagramaFile.value(id.toInt());
-    udp_socket->writeDatagram(datagram, socket->localAddress(), portUdp.toUShort());
-    while (true){
-        if (socket->waitForReadyRead(waitAnswer)) break;
-        else udp_socket->writeDatagram(datagram, socket->localAddress(), portUdp.toUShort());;
+    foreach (int temp, id){
+        udp_socket->abort();
+        streamFile << id;
+        streamFile << datagramaFile.value(temp);
+        udp_socket->writeDatagram(datagram, socket->localAddress(), portUdp.toUShort());
     }
 }
 
@@ -87,16 +85,19 @@ void Client::readAnswer() //Считывание ответа о приняти�
 
     qDebug () << buffer;
     QString message = QString::fromStdString(buffer.toStdString());
+    stream.abortTransaction();
     if (message[0] == "1"){
-        stream.abortTransaction();
         if (datagramaFile.value(endKey) == datagramaFile.value(QString(message.back()).toInt())){
-            qDebug () << "File is sended";
-            udp_socket->close();
-            socket->close();
-            udp_socket->deleteLater();
-            socket->deleteLater();
+            if (datagramaFile.empty()){
+                qDebug () << "File is sended";
+                udp_socket->close();
+                socket->close();
+                udp_socket->deleteLater();
+                socket->deleteLater();
+            }
+            else resendFile(datagramaFile.keys());
         }
-        else emit(startSendFile(QString::number(QString(message.back()).toInt() + 1)));
+        else datagramaFile.remove(QString(message.back()).toInt());
     }
 }
 
